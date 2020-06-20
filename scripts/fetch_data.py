@@ -22,7 +22,7 @@ HIVE_DATABASE = 'chicago_crime'
 HIVE_TABLE = f"{HIVE_DATABASE}.records"
 
 NUM_WORKERS = 4
-BATCH_SIZE = 1000
+BATCH_SIZE = 10000
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -61,7 +61,6 @@ def enforce_types(df):
               withColumn('longitude', df['longitude'].cast('float'))
 
 def query_size(soda_client, dataset):
-    # q = soda_client.get(dataset, query="select count(*) where domestic=true")
     q = soda_client.get(dataset, query="select count(*)")
     return int(q[0]['count'])
 
@@ -72,8 +71,8 @@ def fetch_batch(batch_idx, soda_client, batch_size):
         select='id, case_number, date, block, iucr,\
                 primary_type, description, location_description,\
                 arrest, domestic, beat, district, ward, community_area,\
-                fbi_code, latitude, longitude'#,
-        # domestic=True  # we will extract only domestic crimes
+                fbi_code, latitude, longitude',
+        offset=offset
     )
     return batch_idx, batch[1:]
 
@@ -85,6 +84,7 @@ def main():
         config("spark.sql.legacy.allowCreatingManagedTableUsingNonemptyLocation", True). \
         enableHiveSupport(). \
         getOrCreate()  # create spark session to dump the data into Hive
+    spark.sparkContext.setLogLevel('ERROR')
     logger.info('Initializing Hive database')
     spark.sql(f'drop database if exists {HIVE_DATABASE} cascade')
     spark.sql(f'create database {HIVE_DATABASE}')
